@@ -15,7 +15,7 @@ apk_path = ENV['AC_RESIGN_FILENAME']
 `curl -o "./#{apk_path}" -k #{apk_url}`
 # Debug
 puts "Debug"
-FileUtils.cp(path, "#{ac_output_folder}/ac-test-resigned.apk")
+FileUtils.cp(apk_path, "#{ac_output_folder}/ac-test-resigned.apk")
 #
 
 if options[:keystore_path].nil?
