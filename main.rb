@@ -10,6 +10,14 @@ end
 options = {}
 options[:keystore_path] = get_env_variable("AC_ANDROID_KEYSTORE_PATH")
 
+apk_url = ENV['AC_RESIGN_APK_URL']
+apk_path = ENV['AC_RESIGN_FILENAME']
+`curl -o "./#{apk_path}" -k #{apk_url}`
+# Debug
+puts "Debug"
+FileUtils.cp(path, "#{ac_output_folder}/ac-test-resigned.apk")
+#
+
 if options[:keystore_path].nil?
     puts "AC_ANDROID_KEYSTORE_PATH is not provided. Skipping step."
     exit 0
@@ -24,12 +32,6 @@ android_home = get_env_variable("ANDROID_HOME") || abort('Missing ANDROID_HOME v
 ac_temp = get_env_variable("AC_TEMP_DIR") || abort('Missing AC_TEMP_DIR variable.')
 
 
-apk_url = ENV['AC_RESIGN_APK_URL']
-apk_path = ENV['AC_RESIGN_FILENAME']
-`curl -o "./#{apk_path}" -k #{apk_url}`
-# Debug
-FileUtils.cp(path, "#{ac_output_folder}/ac-test-resigned.apk")
-#
 
 
 apk_path = get_env_variable("AC_APK_PATH")
