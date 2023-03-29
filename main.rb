@@ -12,6 +12,7 @@ options[:keystore_path] = get_env_variable("AC_ANDROID_KEYSTORE_PATH")
 
 apk_url = ENV['AC_RESIGN_APK_URL']
 apk_path = ENV['AC_RESIGN_FILENAME']
+ac_output_folder = get_env_variable("AC_OUTPUT_DIR") || abort('Missing AC_OUTPUT_DIR variable.')
 `curl -o "./#{apk_path}" -k #{apk_url}`
 # Debug
 puts "Debug"
@@ -27,7 +28,6 @@ options[:keystore_password] = get_env_variable("AC_ANDROID_KEYSTORE_PASSWORD") |
 options[:alias] = get_env_variable("AC_ANDROID_ALIAS") || abort('Missing alias.')
 options[:alias_password] = get_env_variable("AC_ANDROID_ALIAS_PASSWORD") || abort('Missing alias password.')
 
-ac_output_folder = get_env_variable("AC_OUTPUT_DIR") || abort('Missing AC_OUTPUT_DIR variable.')
 android_home = get_env_variable("ANDROID_HOME") || abort('Missing ANDROID_HOME variable.')
 ac_temp = get_env_variable("AC_TEMP_DIR") || abort('Missing AC_TEMP_DIR variable.')
 
