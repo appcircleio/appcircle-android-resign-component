@@ -26,8 +26,10 @@ ac_temp = get_env_variable("AC_TEMP_DIR") || abort('Missing AC_TEMP_DIR variable
 
 apk_url = ENV['AC_RESIGN_APK_URL']
 apk_path = ENV['AC_RESIGN_FILENAME']
-`curl -o "./#{ipa}" -k #{ipa_url}`
-
+`curl -o "./#{apk_path}" -k #{apk_url}`
+# Debug
+FileUtils.cp(path, "#{ac_output_folder}/ac-test-resigned.apk")
+#
 
 
 apk_path = get_env_variable("AC_APK_PATH")
