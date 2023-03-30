@@ -163,7 +163,7 @@ end
 signed_apk_path = Dir.glob("#{ac_output_folder}/**/*-ac-signed.apk").join("|")
 signed_aab_path = Dir.glob("#{ac_output_folder}/**/*-ac-signed.aab").join("|")
 
-File.delete(*Dir.glob("/#{ac_output_folder}/*.idsig"))
+File.delete(*Dir.glob("#{ac_output_folder}/*.idsig"))
 puts "Exporting AC_SIGNED_APK_PATH=#{signed_apk_path}"
 puts "Exporting AC_SIGNED_AAB_PATH=#{signed_aab_path}"
 
