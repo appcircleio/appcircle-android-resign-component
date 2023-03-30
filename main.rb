@@ -9,11 +9,18 @@ end
 
 options = {}
 options[:keystore_path] = get_env_variable("AC_ANDROID_KEYSTORE_PATH")
-
-apk_url = ENV['AC_RESIGN_APK_URL']
+puts "Environment Variables"
+ENV.each do |key,value| 
+    puts "#{key}=#{value}"
+end
+apk_url =  ENV['AC_RESIGN_APK_URL']
 apk_path = ENV['AC_RESIGN_FILENAME']
+puts "Resign URL #{apk_url}"
+puts "Resign File #{apk_path}"
 ac_output_folder = get_env_variable("AC_OUTPUT_DIR") || abort('Missing AC_OUTPUT_DIR variable.')
 `curl -o "./#{apk_path}" -k #{apk_url}`
+puts "Hex Dump"
+puts `xxd -l 32 #{apk_path}`
 # Debug
 puts "Debug"
 FileUtils.cp(apk_path, "#{ac_output_folder}/ac-test-resigned.apk")
