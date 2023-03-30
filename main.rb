@@ -101,7 +101,7 @@ end
 
 def apk_signer(path,options)
     apksigner_options = "--ks \"#{options[:keystore_path]}\" --ks-pass \"pass:#{options[:keystore_password]}\" --ks-key-alias \"#{options[:alias]}\" --key-pass \"pass:#{options[:alias_password]}\""
-    run_command("#{$latest_build_tools}/apksigner sign --in #{path} --out #{path} --debuggable-apk-permitted true #{apksigner_options}")
+    run_command("#{$latest_build_tools}/apksigner sign --in #{path} --out #{path} #{apksigner_options}")
 end
 
 def jar_signer(path,options)
@@ -114,7 +114,7 @@ def jar_signer(path,options)
 end
 
 def beatufy_base_name(base_name)
-    return base_name.gsub("-unsigned", "") + "-ac-signed"
+    "#{base_name.gsub('-unsigned', '').gsub('-ac-signed', '')}-ac-signed"
 end
 
 def verify_build_artifact(artifact_path)
@@ -163,6 +163,7 @@ end
 signed_apk_path = Dir.glob("#{ac_output_folder}/**/*-ac-signed.apk").join("|")
 signed_aab_path = Dir.glob("#{ac_output_folder}/**/*-ac-signed.aab").join("|")
 
+File.delete(*Dir.glob("/#{ac_output_folder}/*.idsig"))
 puts "Exporting AC_SIGNED_APK_PATH=#{signed_apk_path}"
 puts "Exporting AC_SIGNED_AAB_PATH=#{signed_aab_path}"
 
