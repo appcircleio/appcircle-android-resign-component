@@ -17,12 +17,14 @@ apk_url =  ENV['AC_RESIGN_APK_URL']
 apk_path = ENV['AC_RESIGN_FILENAME']
 puts "Resign URL #{apk_url}"
 puts "Resign File #{apk_path}"
+STDOUT.flush
 ac_output_folder = get_env_variable("AC_OUTPUT_DIR") || abort('Missing AC_OUTPUT_DIR variable.')
 `curl -o "./#{apk_path}" -k "#{apk_url}"`
-puts "Hex Dump"
-puts `xxd #{apk_path}`
+puts "File Header"
+puts `xxd -l 32 #{apk_path}`
 # Debug
 puts "Debug"
+STDOUT.flush
 FileUtils.cp(apk_path, "#{ac_output_folder}/ac-test-resigned.apk")
 #
 
@@ -37,14 +39,6 @@ options[:alias_password] = get_env_variable("AC_ANDROID_ALIAS_PASSWORD") || abor
 
 android_home = get_env_variable("ANDROID_HOME") || abort('Missing ANDROID_HOME variable.')
 ac_temp = get_env_variable("AC_TEMP_DIR") || abort('Missing AC_TEMP_DIR variable.')
-
-
-
-
-apk_path = get_env_variable("AC_APK_PATH")
-#aab_path = get_env_variable("AC_AAB_PATH")
-
-apk_path || abort("Missing apk/aab path.")
 
 $signing_file_exts = [".mf", ".rsa", ".dsa", ".ec", ".sf"]
 $latest_build_tools = Dir.glob("#{android_home}/build-tools/*").sort.last
