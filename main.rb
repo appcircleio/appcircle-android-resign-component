@@ -22,10 +22,7 @@ ac_output_folder = get_env_variable("AC_OUTPUT_DIR") || abort('Missing AC_OUTPUT
 `curl -o "./#{apk_path}" -k "#{apk_url}"`
 puts "File Header"
 puts `xxd -l 32 #{apk_path}`
-# Debug
-puts "Debug"
 STDOUT.flush
-FileUtils.cp(apk_path, "#{ac_output_folder}/ac-test-resigned.apk")
 #
 
 if options[:keystore_path].nil?
