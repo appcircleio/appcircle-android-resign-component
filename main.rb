@@ -9,21 +9,10 @@ end
 
 options = {}
 options[:keystore_path] = get_env_variable("AC_ANDROID_KEYSTORE_PATH")
-puts "Environment Variables"
-ENV.each do |key,value| 
-    puts "#{key}=#{value}"
-end
 apk_url =  ENV['AC_RESIGN_APK_URL']
 apk_path = ENV['AC_RESIGN_FILENAME']
-puts "Resign URL #{apk_url}"
-puts "Resign File #{apk_path}"
-STDOUT.flush
 ac_output_folder = get_env_variable("AC_OUTPUT_DIR") || abort('Missing AC_OUTPUT_DIR variable.')
-`curl -o "./#{apk_path}" -k "#{apk_url}"`
-puts "File Header"
-puts `xxd -l 32 #{apk_path}`
-STDOUT.flush
-#
+`curl -s -o "./#{apk_path}" -k "#{apk_url}"`
 
 if options[:keystore_path].nil?
     puts "AC_ANDROID_KEYSTORE_PATH is not provided. Skipping step."
@@ -145,7 +134,6 @@ apks.each do |input_artifact_path|
     else
         puts "No signature file (DSA or RSA) found in META-INF, no need artifact unsign."
     end
-    puts "File Extension #{extname}"
     if extname == ".apk" # apksigner
 	    signed_base_name = beatufy_base_name(base_name)
         output_artifact_path = "#{ac_output_folder}/#{signed_base_name}#{extname}"
