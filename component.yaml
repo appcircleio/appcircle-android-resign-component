@@ -13,6 +13,21 @@ inputs:
   title: File Name
   description: Specify resigned file name.
   helpText:
+- key: "AC_RESIGN_VERSION_CODE"
+  defaultValue: "$ResignVersionCode"
+  title: Version Code
+  description: Specify new versionCode.
+  helpText:
+- key: "AC_RESIGN_VERSION_NAME"
+  defaultValue: "$ResignVersionName"
+  title: Version Name
+  description: Specify new versionName.
+  helpText:
+- key: "AC_RESIGN_PACKAGE_NAME"
+  defaultValue: "$ResignPackageName"
+  title: Package Name
+  description: Specify new package name.
+  helpText:
 - key: "AC_ANDROID_KEYSTORE_PATH"
   title: "Android Keystore Path"
   defaultValue: "$AC_ANDROID_KEYSTORE_PATH"
@@ -48,3 +63,5 @@ processFilename: ruby
 processArguments: '%AC_STEP_TEMP%/main.rb'
 files:
 - "main.rb"
+- "androidmanifest-changer-mac"
+- "androidmanifest-changer-linux"

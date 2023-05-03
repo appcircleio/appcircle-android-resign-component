@@ -1,5 +1,6 @@
 require 'yaml'
 require 'open3'
+require 'os'
 require 'find'
 require 'fileutils'
 
@@ -53,6 +54,27 @@ def run_command(command, isLogReturn=false)
         raise stderr_str
     end
     return stdout_all_lines
+end
+
+def update_package(apk_path)
+    parameters = ''
+    version_code = get_env_variable('AC_RESIGN_VERSION_CODE')
+    version_name = get_env_variable('AC_RESIGN_VERSION_NAME')
+    package = get_env_variable('AC_RESIGN_PACKAGE_NAME')
+    parameters += " --versionCode #{version_code}" unless version_code.nil?
+    parameters += " --versionName #{version_name}" unless version_name.nil?
+    parameters += " --package #{package}" unless package.nil?
+    if parameters.empty?
+      puts 'Manifest change skipped'
+    else
+      parameters += " #{apk_path}"
+      ENV['PATH'] = "#{ENV['PATH']}:#{$latest_build_tools}/"
+      os = OS.mac? ? 'mac' : 'linux'
+      changer_path = "./androidmanifest-changer-#{os}"
+      run_command("chmod +x #{changer_path}")
+      cmd = "#{changer_path} #{parameters}"
+      run_command(cmd)
+    end
 end
 
 def filter_meta_files(path) 
@@ -118,6 +140,8 @@ def zipalign_build_artifact(artifact_path, output_artifact_path)
     puts "Zipalign build artifact..."
     run_command("#{$latest_build_tools}/zipalign -f 4 #{artifact_path} #{output_artifact_path}")
 end
+
+update_package(apk_path)
 
 apks = (apk_path || "").split("|")
 apks.each do |input_artifact_path|
