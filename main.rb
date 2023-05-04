@@ -57,7 +57,11 @@ def run_command(command, isLogReturn=false)
 end
 
 def update_package(apk_path)
-    targets_json = ENV['AC_RESIGN_TARGETS']
+    targets_json = get_env_variable('AC_RESIGN_TARGETS')
+    if targets_json.nil?
+        puts "Missing $AC_RESIGN_TARGETS. Manifest change skipped"
+        return
+    end
     targets = JSON.parse(File.read(targets_json))
     main_target = targets.first
     parameters = ''
@@ -68,7 +72,7 @@ def update_package(apk_path)
     parameters += " --versionName #{version_name}" unless version_name.nil?
     parameters += " --package #{package}" unless package.nil?
     if parameters.empty?
-      puts 'Manifest change skipped'
+      puts '$AC_RESIGN_TARGETS empty. Manifest change skipped'
     else
       parameters += " #{apk_path}"
       ENV['PATH'] = "#{ENV['PATH']}:#{$latest_build_tools}/"
