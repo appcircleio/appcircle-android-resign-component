@@ -57,10 +57,13 @@ def run_command(command, isLogReturn=false)
 end
 
 def update_package(apk_path)
+    targets_json = ENV['AC_RESIGN_TARGETS']
+    targets = JSON.parse(File.read(targets_json))
+    main_target = targets.first
     parameters = ''
-    version_code = get_env_variable('AC_RESIGN_VERSION_CODE')
-    version_name = get_env_variable('AC_RESIGN_VERSION_NAME')
-    package = get_env_variable('AC_RESIGN_PACKAGE_NAME')
+    version_name = main_target['Version']
+    version_code = main_target['BuildNumber']
+    package = main_target['BundleId']
     parameters += " --versionCode #{version_code}" unless version_code.nil?
     parameters += " --versionName #{version_name}" unless version_name.nil?
     parameters += " --package #{package}" unless package.nil?
