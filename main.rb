@@ -4,6 +4,8 @@ require 'os'
 require 'find'
 require 'fileutils'
 require 'json'
+require 'dotenv'
+Dotenv.load
 
 def get_env_variable(key)
 	return (ENV[key] == nil || ENV[key] == "") ? nil : ENV[key]
@@ -78,7 +80,7 @@ def update_package(apk_path)
       parameters += " #{apk_path}"
       ENV['PATH'] = "#{ENV['PATH']}:#{$latest_build_tools}/"
       os = OS.mac? ? 'mac' : 'linux'
-      changer_path = "./androidmanifest-changer-#{os}"
+      changer_path = "#{File.expand_path(File.dirname(__FILE__))}/androidmanifest-changer-#{os}"
       run_command("chmod +x #{changer_path}")
       cmd = "#{changer_path} #{parameters}"
       run_command(cmd)
