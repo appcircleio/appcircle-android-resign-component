@@ -3,6 +3,7 @@ require 'open3'
 require 'os'
 require 'find'
 require 'fileutils'
+require 'json'
 
 def get_env_variable(key)
 	return (ENV[key] == nil || ENV[key] == "") ? nil : ENV[key]
