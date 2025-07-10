@@ -1,9 +1,9 @@
-require 'yaml'
 require 'open3'
 require 'os'
-require 'find'
 require 'fileutils'
+require 'open-uri'
 require 'json'
+require 'uri'
 require 'dotenv'
 Dotenv.load
 
@@ -11,11 +11,18 @@ def get_env_variable(key)
 	return (ENV[key] == nil || ENV[key] == "") ? nil : ENV[key]
 end
 
+def env_has_key(key)
+    value = get_env_variable(key)
+    return value unless value.nil? || value.empty?
+ 
+    abort("Input #{key} is missing.")
+end
+
 options = {}
 options[:keystore_path] = get_env_variable("AC_ANDROID_KEYSTORE_PATH")
-apk_url =  ENV['AC_RESIGN_APK_URL']
-apk_path = ENV['AC_RESIGN_FILENAME']
-ac_output_folder = get_env_variable("AC_OUTPUT_DIR") || abort('Missing AC_OUTPUT_DIR variable.')
+apk_url =  get_env_variable("AC_RESIGN_APK_URL")
+apk_path = get_env_variable("AC_RESIGN_FILENAME")
+ac_output_folder = env_has_key("AC_OUTPUT_DIR")
 `curl -s -o "./#{apk_path}" -k "#{apk_url}"`
 
 if options[:keystore_path].nil?
@@ -23,12 +30,15 @@ if options[:keystore_path].nil?
     exit 0
 end
 
-options[:keystore_password] = get_env_variable("AC_ANDROID_KEYSTORE_PASSWORD") || abort('Missing keystore password.')
-options[:alias] = get_env_variable("AC_ANDROID_ALIAS") || abort('Missing alias.')
-options[:alias_password] = get_env_variable("AC_ANDROID_ALIAS_PASSWORD") || abort('Missing alias password.')
+options[:keystore_password] = env_has_key("AC_ANDROID_KEYSTORE_PASSWORD")
+options[:alias] = env_has_key("AC_ANDROID_ALIAS")
+options[:alias_password] = env_has_key("AC_ANDROID_ALIAS_PASSWORD")
 
-android_home = get_env_variable("ANDROID_HOME") || abort('Missing ANDROID_HOME variable.')
-ac_temp = get_env_variable("AC_TEMP_DIR") || abort('Missing AC_TEMP_DIR variable.')
+android_home = env_has_key("ANDROID_HOME")
+$ac_temp = env_has_key("AC_TEMP_DIR")
+env_file = env_has_key('AC_ENV_FILE_PATH')
+convert_apk = get_env_variable("AC_ENABLE_CONVERT_AAB_TO_APK") == "true"
+$bundletool_version = get_env_variable("AC_BUNDLETOOL_VERSION")
 
 $signing_file_exts = [".mf", ".rsa", ".dsa", ".ec", ".sf"]
 $latest_build_tools = Dir.glob("#{android_home}/build-tools/*").sort.last
@@ -134,6 +144,52 @@ def jar_signer(path,options)
             
 end
 
+def get_latest_bundletool_version
+    url = "https://api.github.com/repos/google/bundletool/releases/latest"
+    response = URI.open(url).read
+    data = JSON.parse(response)
+    data["tag_name"].gsub(/^v/, '')
+end
+
+def run_bundletool(bundle_path, output_path, keystore_options)
+    $bundletool_version = get_latest_bundletool_version if $bundletool_version.to_s.strip.downcase == "latest"
+  
+    bundle_tool_dir = File.join($ac_temp, "bundletool")
+    bundle_tool_jar = File.join(bundle_tool_dir, "bundletool.jar")
+    bundle_output_dir = File.join($ac_temp, "output", "bundle")
+    apks_path = File.join(bundle_output_dir, "app.apks")
+  
+    FileUtils.mkdir_p(bundle_tool_dir)
+    FileUtils.mkdir_p(bundle_output_dir)
+  
+    unless File.exist?(bundle_tool_jar)
+      bundletool_url = "https://github.com/google/bundletool/releases/download/#{$bundletool_version}/bundletool-all-#{$bundletool_version}.jar"
+      run_command("curl -L #{bundletool_url} -o #{bundle_tool_jar}")
+    end
+  
+    build_apks_cmd = [
+      "java -jar #{bundle_tool_jar}",
+      "build-apks",
+      "--overwrite",
+      "--bundle=\"#{bundle_path}\"",
+      "--output=\"#{apks_path}\"",
+      "--ks=\"#{keystore_options[:keystore_path]}\"",
+      "--ks-pass=pass:#{keystore_options[:keystore_password]}",
+      "--ks-key-alias=\"#{keystore_options[:alias]}\"",
+      "--key-pass=pass:#{keystore_options[:alias_password]}",
+      "--mode=universal"
+    ].join(" ")
+  
+    run_command(build_apks_cmd)
+  
+    run_command("unzip -o #{apks_path} -d #{bundle_output_dir}")
+    universal_apk = File.join(bundle_output_dir, "universal.apk")
+    unless File.exist?(universal_apk)
+      abort("Universal APK not found inside APK set.")
+    end
+    run_command("mv #{universal_apk} #{output_path}")
+end
+
 def beatufy_base_name(base_name)
     "#{base_name.gsub('-unsigned', '').gsub('-ac-signed', '')}-ac-signed"
 end
@@ -158,7 +214,7 @@ apks.each do |input_artifact_path|
     puts "Signing file: #{input_artifact_path}"
     extname = File.extname(input_artifact_path)
     base_name = File.basename(input_artifact_path, extname)
-    artifact_path = "#{ac_temp}/#{base_name}#{extname}"
+    artifact_path = "#{$ac_temp}/#{base_name}#{extname}"
 
     copy_artifact(input_artifact_path, artifact_path)
     meta_files = filter_meta_files(artifact_path)
@@ -168,17 +224,21 @@ apks.each do |input_artifact_path|
     else
         puts "No signature file (DSA or RSA) found in META-INF, no need artifact unsign."
     end
-    if extname == ".apk" # apksigner
-	    signed_base_name = beatufy_base_name(base_name)
-        output_artifact_path = "#{ac_output_folder}/#{signed_base_name}#{extname}"
-        
-	    zipalign_build_artifact(artifact_path, output_artifact_path)
+
+    signed_base_name = beatufy_base_name(base_name)
+    output_extname = (extname == ".aab" && convert_apk) ? ".apk" : extname
+    output_artifact_path = "#{ac_output_folder}/#{signed_base_name}#{output_extname}"
+    zipalign_build_artifact(artifact_path, output_artifact_path)
+
+    if extname == ".apk"
+        puts "AC_ENABLE_CONVERT_AAB_TO_APK is enabled but input is already an APK. Skipping conversion step." if convert_apk
         apk_signer(output_artifact_path,options)
-    else #jarsigner
-        jar_signer(artifact_path,options)
-	    signed_base_name = beatufy_base_name(base_name)
-	    output_artifact_path = "#{ac_output_folder}/#{signed_base_name}#{extname}"
-	    zipalign_build_artifact(artifact_path, output_artifact_path)
+    else
+        if convert_apk
+            run_bundletool(artifact_path, output_artifact_path, options)
+        else
+            jar_signer(artifact_path,options)
+        end
     end
 end
 
@@ -189,8 +249,7 @@ File.delete(*Dir.glob("#{ac_output_folder}/*.idsig"))
 puts "Exporting AC_SIGNED_APK_PATH=#{signed_apk_path}"
 puts "Exporting AC_SIGNED_AAB_PATH=#{signed_aab_path}"
 
-#Write Environment Variable
-open(ENV['AC_ENV_FILE_PATH'], 'a') { |f|
+open(env_file, 'a') { |f|
     f.puts "AC_SIGNED_APK_PATH=#{signed_apk_path}"
     f.puts "AC_SIGNED_AAB_PATH=#{signed_aab_path}"
 }

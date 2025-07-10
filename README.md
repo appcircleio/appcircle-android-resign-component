@@ -16,3 +16,5 @@ Re-sign the unsigned output file from the build step with the selected keystore 
 
 - `AC_SIGNED_APK_PATH`: Signed APK Path. Path of the signed apk file.
 - `AC_SIGNED_AAB_PATH`: Signed AAB Path. Path of the signed aab file.
+- `AC_CONVERT_AAB_TO_APK`: Converts the uploaded AAB into a universal APK using [bundletool](https://developer.android.com/tools/bundletool). This option is only applicable if the uploaded file is an AAB.
+- `AC_BUNDLETOOL_VERSION`: Bundletool version to install. The default value is latest. To install a different version, please refer to [this document](https://github.com/google/bundletool/releases). For example `1.18.1`.
