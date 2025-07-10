@@ -37,7 +37,7 @@ options[:alias_password] = env_has_key("AC_ANDROID_ALIAS_PASSWORD")
 android_home = env_has_key("ANDROID_HOME")
 $ac_temp = env_has_key("AC_TEMP_DIR")
 env_file = env_has_key('AC_ENV_FILE_PATH')
-convert_apk = get_env_variable("AC_ENABLE_CONVERT_AAB_TO_APK") == "true"
+convert_apk = get_env_variable("AC_CONVERT_AAB_TO_APK") == "true"
 $bundletool_version = get_env_variable("AC_BUNDLETOOL_VERSION")
 
 $signing_file_exts = [".mf", ".rsa", ".dsa", ".ec", ".sf"]
@@ -231,7 +231,7 @@ apks.each do |input_artifact_path|
     zipalign_build_artifact(artifact_path, output_artifact_path)
 
     if extname == ".apk"
-        puts "AC_ENABLE_CONVERT_AAB_TO_APK is enabled but input is already an APK. Skipping conversion step." if convert_apk
+        puts "AC_CONVERT_AAB_TO_APK is enabled but input is already an APK. Skipping conversion step." if convert_apk
         apk_signer(output_artifact_path,options)
     else
         if convert_apk
