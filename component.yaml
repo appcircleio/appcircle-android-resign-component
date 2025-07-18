@@ -13,7 +13,7 @@ inputs:
   defaultValue: "$ResignFileName"
   isRequired: true
   title: File Name
-  description: Specify resigned file name.
+  description: Specify re-signed file name.
   helpText:
 - key: "AC_RESIGN_TARGETS"
   defaultValue: "$Targets"
