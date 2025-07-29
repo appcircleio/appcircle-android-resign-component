@@ -228,16 +228,17 @@ apks.each do |input_artifact_path|
     signed_base_name = beatufy_base_name(base_name)
     output_extname = (extname == ".aab" && convert_apk) ? ".apk" : extname
     output_artifact_path = "#{ac_output_folder}/#{signed_base_name}#{output_extname}"
-    zipalign_build_artifact(artifact_path, output_artifact_path)
 
     if extname == ".apk"
         puts "AC_CONVERT_AAB_TO_APK is enabled but input is already an APK. Skipping conversion step." if convert_apk
+        zipalign_build_artifact(artifact_path, output_artifact_path)
         apk_signer(output_artifact_path,options)
     else
         if convert_apk
             run_bundletool(artifact_path, output_artifact_path, options)
         else
             jar_signer(artifact_path,options)
+            zipalign_build_artifact(artifact_path, output_artifact_path)
         end
     end
 end
