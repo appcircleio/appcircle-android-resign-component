@@ -4,6 +4,7 @@ require 'fileutils'
 require 'open-uri'
 require 'json'
 require 'uri'
+require 'digest'
 require 'dotenv'
 Dotenv.load
 
@@ -144,6 +145,9 @@ def jar_signer(path,options)
             
 end
 
+DEFAULT_BUNDLETOOL_VERSION = "1.18.3"
+DEFAULT_BUNDLETOOL_BASE_URL = "https://github.com"
+
 def get_latest_bundletool_version
     url = "https://api.github.com/repos/google/bundletool/releases/latest"
     response = URI.open(url).read
@@ -151,24 +155,79 @@ def get_latest_bundletool_version
     data["tag_name"].gsub(/^v/, '')
 end
 
+# Priority: AC_BUNDLETOOL_URL (used as is), then AC_BUNDLETOOL_BASE_URL, then GitHub.
+def bundletool_download_url
+    full_url = get_env_variable("AC_BUNDLETOOL_URL")&.strip
+    unless full_url.to_s.empty?
+        puts "AC_BUNDLETOOL_URL is set, AC_BUNDLETOOL_VERSION is not used for the download."
+        return full_url
+    end
+
+    version = $bundletool_version.to_s.strip
+    version = DEFAULT_BUNDLETOOL_VERSION if version.empty?
+    version = get_latest_bundletool_version if version.downcase == "latest"
+    base_url = get_env_variable("AC_BUNDLETOOL_BASE_URL")&.strip
+    base_url = DEFAULT_BUNDLETOOL_BASE_URL if base_url.to_s.empty?
+    "#{base_url.chomp('/')}/google/bundletool/releases/download/#{version}/bundletool-all-#{version}.jar"
+end
+
+def mask_url(url)
+    url.sub(%r{//[^/@]+@}, '//***@')
+end
+
+def verify_bundletool(path, url)
+    unless File.binread(path, 4) == "PK\x03\x04".b
+        FileUtils.rm_f(path)
+        abort("@@[error] The file downloaded from #{mask_url(url)} is not a valid jar.")
+    end
+
+    expected = get_env_variable("AC_BUNDLETOOL_SHA256")&.strip
+    return if expected.to_s.empty?
+
+    actual = Digest::SHA256.file(path).hexdigest
+    if actual.casecmp?(expected)
+        puts "Bundletool SHA-256 checksum verified."
+        return
+    end
+
+    FileUtils.rm_f(path)
+    abort("@@[error] Bundletool SHA-256 mismatch. Expected #{expected}, got #{actual}.")
+end
+
+# The jar is cached by the file name in the URL, so a different version is downloaded again.
+def download_bundletool(url, target_dir)
+    file_name = File.basename(url.split('?').first)
+    file_name = "#{file_name}.jar" unless file_name.end_with?(".jar")
+    jar_path = File.join(target_dir, file_name)
+    if File.exist?(jar_path)
+        puts "Bundletool is already downloaded: #{jar_path}"
+        return jar_path
+    end
+
+    puts "Downloading bundletool from #{mask_url(url)}"
+    tmp_path = "#{jar_path}.download"
+    unless system("curl", "-fsSL", "--retry", "3", "-o", tmp_path, url)
+        FileUtils.rm_f(tmp_path)
+        abort("@@[error] Failed to download bundletool from #{mask_url(url)}. " \
+              "Check AC_BUNDLETOOL_VERSION, AC_BUNDLETOOL_URL and AC_BUNDLETOOL_BASE_URL.")
+    end
+    verify_bundletool(tmp_path, url)
+    FileUtils.mv(tmp_path, jar_path)
+    jar_path
+end
+
 def run_bundletool(bundle_path, output_path, keystore_options)
-    $bundletool_version = get_latest_bundletool_version if $bundletool_version.to_s.strip.downcase == "latest"
-  
     bundle_tool_dir = File.join($ac_temp, "bundletool")
-    bundle_tool_jar = File.join(bundle_tool_dir, "bundletool.jar")
     bundle_output_dir = File.join($ac_temp, "output", "bundle")
     apks_path = File.join(bundle_output_dir, "app.apks")
-  
+
     FileUtils.mkdir_p(bundle_tool_dir)
     FileUtils.mkdir_p(bundle_output_dir)
-  
-    unless File.exist?(bundle_tool_jar)
-      bundletool_url = "https://github.com/google/bundletool/releases/download/#{$bundletool_version}/bundletool-all-#{$bundletool_version}.jar"
-      run_command("curl -L #{bundletool_url} -o #{bundle_tool_jar}")
-    end
-  
+
+    bundle_tool_jar = download_bundletool(bundletool_download_url, bundle_tool_dir)
+
     build_apks_cmd = [
-      "java -jar #{bundle_tool_jar}",
+      "java -jar \"#{bundle_tool_jar}\"",
       "build-apks",
       "--overwrite",
       "--bundle=\"#{bundle_path}\"",
