@@ -55,10 +55,28 @@ inputs:
   helpText:
 - key: "AC_BUNDLETOOL_VERSION"
   title: "Bundletool Version"
-  defaultValue: "latest"
+  defaultValue: "1.18.3"
   isRequired: false
-  description: Bundletool version to install. The default value is latest. To install a different version, please refer to [this document](https://github.com/google/bundletool/releases). For example `1.18.1`.
-  helpText: 
+  description: Bundletool version to install. To install a different version, please refer to [this document](https://github.com/google/bundletool/releases). `latest` looks up the latest version on api.github.com and needs internet access. Not used when Bundletool Download URL is set.
+  helpText:
+- key: "AC_BUNDLETOOL_BASE_URL"
+  title: "Bundletool Base URL"
+  defaultValue: ""
+  isRequired: false
+  description: "Base URL to download bundletool from, used instead of `https://github.com`. Point it to your artifact proxy in air-gapped environments. The step appends `/google/bundletool/releases/download/<version>/bundletool-all-<version>.jar`. For example `https://nexus.example.com/repository/github-releases`."
+  helpText:
+- key: "AC_BUNDLETOOL_URL"
+  title: "Bundletool Download URL"
+  defaultValue: ""
+  isRequired: false
+  description: "Full URL of the bundletool jar, used as is. Overrides Bundletool Base URL and Bundletool Version. For example `https://nexus.example.com/repository/bundletool/1.18.3/bundletool-all-1.18.3.jar`."
+  helpText:
+- key: "AC_BUNDLETOOL_SHA256"
+  title: "Bundletool SHA-256"
+  defaultValue: ""
+  isRequired: false
+  description: "Optional SHA-256 checksum of the bundletool jar. If set, the step fails when the downloaded jar does not match."
+  helpText:
 outputs:
 - key: "AC_SIGNED_APK_PATH"
   title: "Signed APK Path"
