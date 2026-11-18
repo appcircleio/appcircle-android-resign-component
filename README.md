@@ -21,3 +21,13 @@ Re-sign the unsigned output file from the build step with the selected keystore 
 - `AC_BUNDLETOOL_BASE_URL`: Bundletool Base URL. Base URL to download bundletool from, used instead of `https://github.com`. The step appends `/google/bundletool/releases/download/<version>/bundletool-all-<version>.jar`. Point it to your artifact proxy in air-gapped environments.
 - `AC_BUNDLETOOL_URL`: Bundletool Download URL. Full URL of the bundletool jar, used as is. Overrides `AC_BUNDLETOOL_BASE_URL` and `AC_BUNDLETOOL_VERSION`.
 - `AC_BUNDLETOOL_SHA256`: Bundletool SHA-256. If set, the step fails when the downloaded jar does not match this checksum.
+
+## Running tests
+
+Requires the [RSpec](https://rspec.info) gem and the Ruby standard library (Coverage, Open3). No Gemfile or Bundler needed. The `os` and `dotenv` gems used by the step are optional for the tests.
+
+```bash
+ruby test/test_main.rb
+```
+
+Tests never execute the Android toolchain (`aapt`, `zipalign`, `apksigner`, `jarsigner`, `bundletool`) or the manifest changer, never touch the network, and only write inside a temporary directory. Helpers that shell out are checked by the command they compose; `main.rb` itself is run in a subprocess against stub tools. A coverage report is printed at the end of each run.

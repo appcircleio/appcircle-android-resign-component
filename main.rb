@@ -1,12 +1,21 @@
 require 'open3'
-require 'os'
+# 'os' and 'dotenv' are installed on the runners. The rescue only lets the file
+# be required in a bare environment (unit tests); it does not change the step.
+begin
+  require 'os'
+rescue LoadError
+end
 require 'fileutils'
 require 'open-uri'
 require 'json'
 require 'uri'
 require 'digest'
-require 'dotenv'
-Dotenv.load
+begin
+  require 'dotenv'
+rescue LoadError
+end
+
+$signing_file_exts = [".mf", ".rsa", ".dsa", ".ec", ".sf"]
 
 def get_env_variable(key)
 	return (ENV[key] == nil || ENV[key] == "") ? nil : ENV[key]
@@ -19,32 +28,9 @@ def env_has_key(key)
     abort("Input #{key} is missing.")
 end
 
-options = {}
-options[:keystore_path] = get_env_variable("AC_ANDROID_KEYSTORE_PATH")
-apk_url =  get_env_variable("AC_RESIGN_APK_URL")
-apk_path = get_env_variable("AC_RESIGN_FILENAME")
-ac_output_folder = env_has_key("AC_OUTPUT_DIR")
-`curl -s -o "./#{apk_path}" -k "#{apk_url}"`
-
-if options[:keystore_path].nil?
-    puts "AC_ANDROID_KEYSTORE_PATH is not provided. Skipping step."
-    exit 0
-end
-
-options[:keystore_password] = env_has_key("AC_ANDROID_KEYSTORE_PASSWORD")
-options[:alias] = env_has_key("AC_ANDROID_ALIAS")
-options[:alias_password] = env_has_key("AC_ANDROID_ALIAS_PASSWORD")
-
-android_home = env_has_key("ANDROID_HOME")
-$ac_temp = env_has_key("AC_TEMP_DIR")
-env_file = env_has_key('AC_ENV_FILE_PATH')
-convert_apk = get_env_variable("AC_CONVERT_AAB_TO_APK") == "true"
-$bundletool_version = get_env_variable("AC_BUNDLETOOL_VERSION")
-
-$signing_file_exts = [".mf", ".rsa", ".dsa", ".ec", ".sf"]
-$latest_build_tools = Dir.glob("#{android_home}/build-tools/*").sort.last
-
 def run_command(command, isLogReturn=false)
+    raise ArgumentError, "run_command requires a non-empty command string, got #{command.inspect}." if command.nil? || command.to_s.strip.empty?
+
     puts "@@[command] #{command}"
     status = nil
     stdout_str = nil
@@ -78,6 +64,9 @@ def update_package(apk_path)
     end
     targets = JSON.parse(File.read(targets_json))
     main_target = targets.first
+    unless main_target.is_a?(Hash)
+      raise "$AC_RESIGN_TARGETS (#{targets_json}) must be a JSON array whose first item is a target object, got #{main_target.inspect}."
+    end
     parameters = ''
     version_name = main_target['Version']
     version_code = main_target['BuildNumber']
@@ -98,7 +87,9 @@ def update_package(apk_path)
     end
 end
 
-def filter_meta_files(path) 
+def filter_meta_files(path)
+    raise ArgumentError, "filter_meta_files requires a non-empty artifact path, got #{path.inspect}." if path.nil? || path.to_s.empty?
+
     return run_command("#{$latest_build_tools}/aapt ls #{path} | grep META-INF", true).split("\n")
 end
 
@@ -106,8 +97,10 @@ def copy_artifact(current_path, dest_path)
     FileUtils.cp(current_path, dest_path)
 end
 
-def is_signed(meta_files) 
-    meta_files.each do |file| 
+def is_signed(meta_files)
+    raise ArgumentError, "META-INF file list is nil; cannot determine the signing status." if meta_files.nil?
+
+    meta_files.each do |file|
         if file.downcase.include?(".dsa") || file.downcase.include?(".rsa")
             return true
         end
@@ -115,7 +108,9 @@ def is_signed(meta_files)
     return false
 end
 
-def get_signing_files(meta_files) 
+def get_signing_files(meta_files)
+    raise ArgumentError, "META-INF file list is nil; cannot collect the signing files." if meta_files.nil?
+
     signing_files = ""
     meta_files.each do |file|
         extname = File.extname(file).to_s.downcase
@@ -132,11 +127,15 @@ def unsign_artifact(path, files)
 end
 
 def apk_signer(path,options)
+    raise ArgumentError, "apk_signer requires the keystore options for #{path.inspect}, got nil." if options.nil?
+
     apksigner_options = "--ks \"#{options[:keystore_path]}\" --ks-pass \'pass:#{options[:keystore_password]}\' --ks-key-alias \"#{options[:alias]}\" --key-pass \'pass:#{options[:alias_password]}\'"
     run_command("#{$latest_build_tools}/apksigner sign --in #{path} --out #{path} #{apksigner_options}")
 end
 
 def jar_signer(path,options)
+    raise ArgumentError, "jar_signer requires the keystore options for #{path.inspect}, got nil." if options.nil?
+
     keystore_options = "-keystore \"#{options[:keystore_path]}\" "\
                     "-storepass \'#{options[:keystore_password]}\' "\
                     "-keypass \'#{options[:alias_password]}\'"
@@ -152,7 +151,9 @@ def get_latest_bundletool_version
     url = "https://api.github.com/repos/google/bundletool/releases/latest"
     response = URI.open(url).read
     data = JSON.parse(response)
-    data["tag_name"].gsub(/^v/, '')
+    tag_name = data.is_a?(Hash) ? data["tag_name"] : nil
+    raise "Could not read the latest bundletool version from #{url}: tag_name is missing." if tag_name.nil?
+    tag_name.gsub(/^v/, '')
 end
 
 # Priority: AC_BUNDLETOOL_URL (used as is), then AC_BUNDLETOOL_BASE_URL, then GitHub.
@@ -217,6 +218,9 @@ def download_bundletool(url, target_dir)
 end
 
 def run_bundletool(bundle_path, output_path, keystore_options)
+    raise ArgumentError, "run_bundletool requires the keystore options for #{bundle_path.inspect}, got nil." if keystore_options.nil?
+    raise ArgumentError, "run_bundletool requires $ac_temp (AC_TEMP_DIR) to be set." if $ac_temp.nil?
+
     bundle_tool_dir = File.join($ac_temp, "bundletool")
     bundle_output_dir = File.join($ac_temp, "output", "bundle")
     apks_path = File.join(bundle_output_dir, "app.apks")
@@ -250,6 +254,8 @@ def run_bundletool(bundle_path, output_path, keystore_options)
 end
 
 def beatufy_base_name(base_name)
+    raise ArgumentError, "beatufy_base_name requires a base name, got nil." if base_name.nil?
+
     "#{base_name.gsub('-unsigned', '').gsub('-ac-signed', '')}-ac-signed"
 end
 
@@ -265,6 +271,34 @@ def zipalign_build_artifact(artifact_path, output_artifact_path)
     puts "Zipalign build artifact..."
     run_command("#{$latest_build_tools}/zipalign -f 4 #{artifact_path} #{output_artifact_path}")
 end
+
+if __FILE__ == $PROGRAM_NAME
+
+Dotenv.load if defined?(Dotenv)
+
+options = {}
+options[:keystore_path] = get_env_variable("AC_ANDROID_KEYSTORE_PATH")
+apk_url =  get_env_variable("AC_RESIGN_APK_URL")
+apk_path = get_env_variable("AC_RESIGN_FILENAME")
+ac_output_folder = env_has_key("AC_OUTPUT_DIR")
+`curl -s -o "./#{apk_path}" -k "#{apk_url}"`
+
+if options[:keystore_path].nil?
+    puts "AC_ANDROID_KEYSTORE_PATH is not provided. Skipping step."
+    exit 0
+end
+
+options[:keystore_password] = env_has_key("AC_ANDROID_KEYSTORE_PASSWORD")
+options[:alias] = env_has_key("AC_ANDROID_ALIAS")
+options[:alias_password] = env_has_key("AC_ANDROID_ALIAS_PASSWORD")
+
+android_home = env_has_key("ANDROID_HOME")
+$ac_temp = env_has_key("AC_TEMP_DIR")
+env_file = env_has_key('AC_ENV_FILE_PATH')
+convert_apk = get_env_variable("AC_CONVERT_AAB_TO_APK") == "true"
+$bundletool_version = get_env_variable("AC_BUNDLETOOL_VERSION")
+
+$latest_build_tools = Dir.glob("#{android_home}/build-tools/*").sort.last
 
 update_package(apk_path)
 
@@ -315,3 +349,5 @@ open(env_file, 'a') { |f|
 }
 
 exit 0
+
+end # if __FILE__ == $PROGRAM_NAME
